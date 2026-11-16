@@ -3,36 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart IoT Patient & Room Monitoring</title>
+    <title>Smart IoT Patient & Room Monitoring (Pro)</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 25px; border-radius: 12px; margin-bottom: 20px; border-left: 5px solid #38bdf8; }
-        .header h1 { margin: 0; font-size: 22px; color: #38bdf8; }
-        .status-badge { background: #065f46; color: #34d399; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; margin-left: 10px; }
-        .sim-btn { background: #10b981; color: white; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        /* Login Overlay */
+        #loginOverlay { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.96); display: flex; justify-content: center; align-items: center; z-index: 1000; }
+        .login-box { background: #1e293b; padding: 35px; border-radius: 16px; width: 340px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.5); border: 1px solid #334155; }
+        .login-box h2 { color: #38bdf8; margin-top: 0; }
+        .role-btn { width: 100%; padding: 12px; margin: 10px 0; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .doc-btn { background: #38bdf8; color: #0f172a; }
+        .fam-btn { background: #334155; color: #f8fafc; }
+        
+        /* Header */
+        .header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 25px; border-radius: 12px; margin-bottom: 20px; border-left: 5px solid #38bdf8; gap: 10px; }
+        .header h1 { margin: 0; font-size: 20px; color: #38bdf8; }
+        .badge { background: #065f46; color: #34d399; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; margin-left: 8px; }
+        .btn { border: none; padding: 9px 15px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; }
+        .sim-btn { background: #10b981; color: white; }
         .sim-btn.active { background: #ef4444; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .card { background: #1e293b; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
-        .card h3 { margin: 0 0 10px; font-size: 14px; color: #94a3b8; text-transform: uppercase; }
-        .card .value { font-size: 32px; font-weight: bold; color: #38bdf8; }
-        .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
-        .control-box { background: #1e293b; padding: 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
-        .toggle-btn { padding: 10px 25px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.3s; }
+        .csv-btn { background: #8b5cf6; color: white; }
+        .logout-btn { background: #475569; color: white; }
+
+        /* AI Risk Banner */
+        .risk-banner { background: #1e293b; padding: 15px 25px; border-radius: 12px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; border-left: 6px solid #10b981; }
+        .risk-banner.warning { border-left-color: #f59e0b; background: #451a03; }
+        .risk-banner.critical { border-left-color: #ef4444; background: #450a0a; animation: pulse 1s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.75; } }
+
+        /* Grid Cards */
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .card { background: #1e293b; padding: 18px; border-radius: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .card h3 { margin: 0 0 8px; font-size: 13px; color: #94a3b8; text-transform: uppercase; }
+        .card .value { font-size: 30px; font-weight: bold; color: #38bdf8; }
+
+        /* Controls & Thresholds */
+        .mid-section { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .panel { background: #1e293b; padding: 18px; border-radius: 12px; }
+        .control-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .toggle-btn { padding: 8px 20px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        .toggle-btn:disabled { opacity: 0.4; cursor: not-allowed; }
         .off { background: #475569; color: white; }
         .on { background: #38bdf8; color: #0f172a; }
-        .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
-        .chart-container { background: #1e293b; padding: 20px; border-radius: 12px; }
+        input[type="number"] { width: 65px; padding: 6px; border-radius: 6px; border: 1px solid #475569; background: #0f172a; color: white; font-weight: bold; }
+
+        /* Charts & Logs */
+        .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px; margin-bottom: 20px; }
+        .chart-container { background: #1e293b; padding: 15px; border-radius: 12px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 13px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #334155; }
+        th { color: #38bdf8; }
     </style>
 </head>
 <body>
 
+    <!-- Module 1: Role-Based Access Control -->
+    <div id="loginOverlay">
+        <div class="login-box">
+            <h2>🏥 Smart Care Portal</h2>
+            <p style="color:#94a3b8; font-size:14px;">Select Access Role to Continue</p>
+            <button class="role-btn doc-btn" onclick="login('Doctor')">👨‍⚕️ Login as Doctor / Admin</button>
+            <button class="role-btn fam-btn" onclick="login('Family')">👪 Login as Family (View Only)</button>
+        </div>
+    </div>
+
     <div class="header">
         <div>
-            <h1>🏥 Smart Patient Health & Room Automation <span class="status-badge" id="dbStatus">● Firebase Connected</span></h1>
-            <small style="color: #94a3b8;">Cloud Endpoint: smart-patient-monitor-8704e-default-rtdb.firebaseio.com</small>
+            <h1>Smart Patient Health & Room Automation <span class="badge" id="roleBadge">Role: --</span></h1>
+            <small style="color: #94a3b8;">Cloud: smart-patient-monitor-8704e-default-rtdb.firebaseio.com</small>
         </div>
-        <button id="simToggle" class="sim-btn" onclick="toggleSimulation()">▶ Start Live Cloud Simulation</button>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button id="simToggle" class="btn sim-btn" onclick="toggleSimulation()">▶ Start Live Simulation</button>
+            <button class="btn csv-btn" onclick="downloadCSV()">📥 Download CSV Report</button>
+            <button class="btn logout-btn" onclick="location.reload()">Switch Role</button>
+        </div>
+    </div>
+
+    <!-- Module 2 & 5: AI Health Risk Prediction & Audio Alarm -->
+    <div class="risk-banner" id="riskBanner">
+        <div>
+            <strong style="font-size:16px;" id="riskTitle">✅ AI Health Analysis: STABLE (Normal Vitals)</strong>
+            <div style="font-size:13px; color:#cbd5e1;" id="riskDesc">All patient vitals and room conditions are within safe medical thresholds.</div>
+        </div>
+        <div style="text-align:right;">
+            <span style="font-size:12px; color:#94a3b8;">HEALTH RISK SCORE</span>
+            <div style="font-size:24px; font-weight:bold;" id="riskScore">12%</div>
+            <button id="muteBtn" class="btn" style="background:#ef4444; color:white; display:none; margin-top:5px;" onclick="muteAlarm()">🔕 Acknowledge Alarm</button>
+        </div>
     </div>
 
     <!-- Sensor Cards -->
@@ -46,170 +103,227 @@
             <div class="value" id="spo2Val" style="color: #34d399;">-- <small style="font-size:14px;">%</small></div>
         </div>
         <div class="card">
-            <h3>Body Temp (MLX90614)</h3>
-            <div class="value" id="bodyTempVal" style="color: #fbbf24;">-- <small style="font-size:14px;">°F</small></div>
-        </div>
-        <div class="card">
             <h3>Room Temp (DHT22)</h3>
             <div class="value" id="roomTempVal" style="color: #f87171;">-- <small style="font-size:14px;">°C</small></div>
         </div>
         <div class="card">
-            <h3>Patient Status (MPU6050)</h3>
-            <div class="value" id="fallVal" style="color: #34d399; font-size: 24px;">NORMAL</div>
+            <h3>Emergency SOS</h3>
+            <div class="value" id="sosVal" style="color: #34d399; font-size: 22px;">SAFE</div>
         </div>
     </div>
 
-    <!-- Interactive Room Automation Controls -->
-    <div class="controls">
-        <div class="control-box">
-            <div>
-                <h3 style="margin:0;">Cooling Fan (Relay 1)</h3>
-                <small id="fanMode" style="color:#94a3b8;">Mode: Auto (Triggers > 30°C)</small>
+    <!-- Module 3: Controls & Dynamic Threshold Settings -->
+    <div class="mid-section">
+        <div class="panel">
+            <h3 style="margin-top:0; color:#38bdf8;">⚡ Room Actuators (Relay Control)</h3>
+            <div class="control-row">
+                <span>Cooling Fan (Auto / Manual)</span>
+                <button id="fanBtn" class="toggle-btn off" onclick="toggleDevice('fan')">OFF</button>
             </div>
-            <button id="fanBtn" class="toggle-btn off" onclick="toggleDevice('fan')">OFF</button>
+            <div class="control-row" style="margin-bottom:0;">
+                <span>Room Light (Manual Override)</span>
+                <button id="lightBtn" class="toggle-btn off" onclick="toggleDevice('light')">OFF</button>
+            </div>
         </div>
-        <div class="control-box">
-            <div>
-                <h3 style="margin:0;">Room Light (Relay 2)</h3>
-                <small style="color:#94a3b8;">Mode: Manual Override</small>
+
+        <div class="panel">
+            <h3 style="margin-top:0; color:#38bdf8;">⚙️ Dynamic Cloud Thresholds</h3>
+            <div class="control-row">
+                <span>Auto-Fan Temp Limit (°C):</span>
+                <input type="number" id="tempLimit" value="30">
             </div>
-            <button id="lightBtn" class="toggle-btn off" onclick="toggleDevice('light')">OFF</button>
+            <div class="control-row" style="margin-bottom:0;">
+                <span>Critical Heart Rate (BPM):</span>
+                <input type="number" id="hrLimit" value="105">
+            </div>
         </div>
     </div>
 
     <!-- Real-Time Charts -->
     <div class="charts">
-        <div class="chart-container">
-            <canvas id="hrChart"></canvas>
-        </div>
-        <div class="chart-container">
-            <canvas id="tempChart"></canvas>
-        </div>
+        <div class="chart-container"><canvas id="hrChart"></canvas></div>
+        <div class="chart-container"><canvas id="tempChart"></canvas></div>
+    </div>
+
+    <!-- Module 4: Historical Vitals Log -->
+    <div class="panel">
+        <h3 style="margin-top:0; color:#38bdf8;">📋 Recent Medical Telemetry Logs (Live History)</h3>
+        <table>
+            <thead>
+                <tr><th>Time</th><th>Heart Rate</th><th>SpO2</th><th>Room Temp</th><th>AI Risk Status</th></tr>
+            </thead>
+            <tbody id="logTable"></tbody>
+        </table>
     </div>
 
     <script>
         const DB_URL = "https://smart-patient-monitor-8704e-default-rtdb.firebaseio.com";
+        let currentRole = "Doctor";
+        let fanState = false, lightState = false, alarmMuted = false;
+        let historyLogs = [];
 
-        // --- Setup Live Charts ---
+        // Role Login Logic
+        function login(role) {
+            currentRole = role;
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('roleBadge').innerText = `Role: ${role}`;
+            if (role === 'Family') {
+                document.getElementById('fanBtn').disabled = true;
+                document.getElementById('lightBtn').disabled = true;
+                document.getElementById('tempLimit').disabled = true;
+                document.getElementById('hrLimit').disabled = true;
+            }
+        }
+
+        // Audio Beep Generator (Web Audio API)
+        function playBeep() {
+            if (alarmMuted) return;
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            osc.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.25);
+        }
+
+        function muteAlarm() {
+            alarmMuted = true;
+            document.getElementById('muteBtn').style.display = 'none';
+        }
+
+        // Charts Setup
         const labels = ['10s', '8s', '6s', '4s', '2s', 'Now'];
         const hrChart = new Chart(document.getElementById('hrChart'), {
             type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{ label: 'Live Heart Rate (BPM)', data: [74, 75, 77, 76, 78, 76], borderColor: '#38bdf8', tension: 0.4, fill: true, backgroundColor: 'rgba(56, 189, 248, 0.1)' }]
-            },
-            options: { plugins: { legend: { labels: { color: 'white' } } }, scales: { x: { ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8' } } } }
+            data: { labels, datasets: [{ label: 'Heart Rate (BPM)', data: [75, 76, 78, 77, 79, 76], borderColor: '#38bdf8', tension: 0.4 }] },
+            options: { plugins: { legend: { labels: { color: 'white' } } } }
         });
-
         const tempChart = new Chart(document.getElementById('tempChart'), {
             type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{ label: 'Room Temperature (°C)', data: [27.5, 28.0, 28.2, 28.5, 29.0, 28.5], borderColor: '#f87171', tension: 0.4, fill: true, backgroundColor: 'rgba(248, 113, 113, 0.1)' }]
-            },
-            options: { plugins: { legend: { labels: { color: 'white' } } }, scales: { x: { ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8' } } } }
+            data: { labels, datasets: [{ label: 'Room Temp (°C)', data: [28, 28.5, 29, 29.2, 29.5, 29], borderColor: '#f87171', tension: 0.4 }] },
+            options: { plugins: { legend: { labels: { color: 'white' } } } }
         });
 
-        let fanState = false;
-        let lightState = false;
-
-        // --- Send Control Commands to Firebase ---
         async function toggleDevice(device) {
-            if (device === 'fan') {
-                fanState = !fanState;
-                updateButtonUI('fanBtn', fanState);
-            } else if (device === 'light') {
-                lightState = !lightState;
-                updateButtonUI('lightBtn', lightState);
-            }
+            if (currentRole !== 'Doctor') return;
+            if (device === 'fan') fanState = !fanState;
+            if (device === 'light') lightState = !lightState;
+            updateButtons();
             await fetch(`${DB_URL}/controls.json`, {
                 method: 'PATCH',
                 body: JSON.stringify({ fan: fanState ? 1 : 0, light: lightState ? 1 : 0 })
             });
         }
 
-        function updateButtonUI(btnId, state) {
-            const btn = document.getElementById(btnId);
-            btn.innerText = state ? 'ON' : 'OFF';
-            btn.className = state ? 'toggle-btn on' : 'toggle-btn off';
+        function updateButtons() {
+            const fBtn = document.getElementById('fanBtn');
+            fBtn.innerText = fanState ? 'ON' : 'OFF';
+            fBtn.className = fanState ? 'toggle-btn on' : 'toggle-btn off';
+            const lBtn = document.getElementById('lightBtn');
+            lBtn.innerText = lightState ? 'ON' : 'OFF';
+            lBtn.className = lightState ? 'toggle-btn on' : 'toggle-btn off';
         }
 
-        // --- Fetch Live Data from Firebase ---
-        async function fetchFirebaseData() {
+        // AI Risk Analysis & UI Update
+        function evaluateHealth(hr, spo2, roomTemp) {
+            const hrLim = parseFloat(document.getElementById('hrLimit').value) || 105;
+            const banner = document.getElementById('riskBanner');
+            const title = document.getElementById('riskTitle');
+            const desc = document.getElementById('riskDesc');
+            const scoreEl = document.getElementById('riskScore');
+
+            let status = "STABLE";
+            if (hr > hrLim || spo2 < 93) {
+                status = "CRITICAL";
+                banner.className = "risk-banner critical";
+                title.innerText = "🚨 CRITICAL ALERT: Abnormal Vitals Detected!";
+                desc.innerText = `Heart Rate (${hr} BPM) or SpO2 (${spo2}%) breached safe medical limits!`;
+                scoreEl.innerText = "88%";
+                document.getElementById('muteBtn').style.display = 'inline-block';
+                playBeep();
+            } else if (roomTemp > parseFloat(document.getElementById('tempLimit').value)) {
+                status = "WARNING";
+                banner.className = "risk-banner warning";
+                title.innerText = "⚠️ WARNING: High Room Temperature";
+                desc.innerText = "Autonomous Cooling Fan triggered to prevent patient heat stress.";
+                scoreEl.innerText = "45%";
+            } else {
+                alarmMuted = false;
+                banner.className = "risk-banner";
+                title.innerText = "✅ AI Health Analysis: STABLE (Normal Vitals)";
+                desc.innerText = "All patient vitals and room conditions are within safe medical thresholds.";
+                scoreEl.innerText = "12%";
+                document.getElementById('muteBtn').style.display = 'none';
+            }
+
+            // Save to History Log
+            const now = new Date().toLocaleTimeString();
+            historyLogs.unshift({ time: now, hr, spo2, roomTemp, status });
+            if (historyLogs.length > 6) historyLogs.pop();
+            document.getElementById('logTable').innerHTML = historyLogs.map(l =>
+                `<tr><td>${l.time}</td><td>${l.hr} BPM</td><td>${l.spo2}%</td><td>${l.roomTemp}°C</td><td><b>${l.status}</b></td></tr>`
+            ).join('');
+        }
+
+        // Fetch Firebase Data
+        async function syncFirebase() {
             try {
                 const res = await fetch(`${DB_URL}/.json`);
                 const data = await res.json();
-                if (!data) return;
+                if (!data || !data.sensors) return;
+                const s = data.sensors;
+                document.getElementById('hrVal').innerHTML = `${s.heartRate} <small style="font-size:14px;">BPM</small>`;
+                document.getElementById('spo2Val').innerHTML = `${s.spo2} <small style="font-size:14px;">%</small>`;
+                document.getElementById('roomTempVal').innerHTML = `${s.roomTemp} <small style="font-size:14px;">°C</small>`;
 
-                if (data.sensors) {
-                    const s = data.sensors;
-                    document.getElementById('hrVal').innerHTML = `${s.heartRate} <small style="font-size:14px;">BPM</small>`;
-                    document.getElementById('spo2Val').innerHTML = `${s.spo2} <small style="font-size:14px;">%</small>`;
-                    document.getElementById('bodyTempVal').innerHTML = `${s.bodyTemp} <small style="font-size:14px;">°F</small>`;
-                    document.getElementById('roomTempVal').innerHTML = `${s.roomTemp} <small style="font-size:14px;">°C</small>`;
+                hrChart.data.datasets[0].data.shift(); hrChart.data.datasets[0].data.push(s.heartRate); hrChart.update();
+                tempChart.data.datasets[0].data.shift(); tempChart.data.datasets[0].data.push(s.roomTemp); tempChart.update();
 
-                    hrChart.data.datasets[0].data.shift();
-                    hrChart.data.datasets[0].data.push(s.heartRate);
-                    hrChart.update();
-
-                    tempChart.data.datasets[0].data.shift();
-                    tempChart.data.datasets[0].data.push(s.roomTemp);
-                    tempChart.update();
-                }
+                evaluateHealth(s.heartRate, s.spo2, s.roomTemp);
 
                 if (data.controls) {
                     fanState = data.controls.fan === 1;
                     lightState = data.controls.light === 1;
-                    updateButtonUI('fanBtn', fanState);
-                    updateButtonUI('lightBtn', lightState);
+                    updateButtons();
                 }
-            } catch (err) {
-                console.error("Firebase Sync Error:", err);
-            }
+            } catch (e) { console.error(e); }
+        }
+        setInterval(syncFirebase, 2500);
+
+        // CSV Export Function
+        function downloadCSV() {
+            let csv = "Time,Heart Rate (BPM),SpO2 (%),Room Temp (C),AI Status\n";
+            historyLogs.forEach(r => { csv += `${r.time},${r.hr},${r.spo2},${r.roomTemp},${r.status}\n`; });
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'Patient_Medical_Report.csv';
+            a.click();
         }
 
-        // Sync every 2 seconds
-        setInterval(fetchFirebaseData, 2000);
-
-        // --- Simulation Mode: Pushes realistic ESP32 data directly to Firebase ---
+        // Simulation Mode
         let simInterval = null;
         function toggleSimulation() {
             const btn = document.getElementById('simToggle');
             if (simInterval) {
-                clearInterval(simInterval);
-                simInterval = null;
-                btn.innerText = '▶ Start Live Cloud Simulation';
-                btn.classList.remove('active');
+                clearInterval(simInterval); simInterval = null;
+                btn.innerText = '▶ Start Live Simulation'; btn.classList.remove('active');
             } else {
-                btn.innerText = '⏹ Stop Simulation';
-                btn.classList.add('active');
+                btn.innerText = '⏹ Stop Simulation'; btn.classList.add('active');
                 simInterval = setInterval(async () => {
-                    const hr = Math.floor(Math.random() * (95 - 68 + 1)) + 68;
-                    const spo2 = Math.floor(Math.random() * (99 - 95 + 1)) + 95;
-                    const bodyTemp = parseFloat((Math.random() * (99.5 - 97.8) + 97.8).toFixed(1));
-                    const roomTemp = parseFloat((Math.random() * (32.0 - 27.5) + 27.5).toFixed(1));
+                    const hr = Math.floor(Math.random() * (112 - 70 + 1)) + 70;
+                    const spo2 = Math.floor(Math.random() * (99 - 92 + 1)) + 92;
+                    const roomTemp = parseFloat((Math.random() * (32.5 - 27.5) + 27.5).toFixed(1));
+                    const tempLimit = parseFloat(document.getElementById('tempLimit').value) || 30;
 
-                    // Autonomous Fan Trigger (>30°C)
-                    if (roomTemp > 30.0 && !fanState) {
+                    if (roomTemp > tempLimit && !fanState) {
                         fanState = true;
-                        document.getElementById('fanMode').innerText = "Mode: AUTO-TRIGGERED (>30°C)";
-                        document.getElementById('fanMode').style.color = "#38bdf8";
-                        await fetch(`${DB_URL}/controls.json`, {
-                            method: 'PATCH',
-                            body: JSON.stringify({ fan: 1 })
-                        });
+                        await fetch(`${DB_URL}/controls.json`, { method: 'PATCH', body: JSON.stringify({ fan: 1 }) });
                     }
-
-                    // Push simulated sensor readings to Firebase
                     await fetch(`${DB_URL}/sensors.json`, {
                         method: 'PUT',
-                        body: JSON.stringify({
-                            heartRate: hr,
-                            spo2: spo2,
-                            bodyTemp: bodyTemp,
-                            roomTemp: roomTemp,
-                            fallDetected: false
-                        })
+                        body: JSON.stringify({ heartRate: hr, spo2, roomTemp })
                     });
                 }, 2500);
             }
