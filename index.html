@@ -13,7 +13,9 @@
         .login-box h2 { color: #38bdf8; margin-top: 0; }
         .role-btn { width: 100%; padding: 12px; margin: 10px 0; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .doc-btn { background: #38bdf8; color: #0f172a; }
+        .doc-btn:hover { background: #0284c7; color: white; }
         .fam-btn { background: #334155; color: #f8fafc; }
+        .fam-btn:hover { background: #475569; }
         
         /* Header */
         .header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 25px; border-radius: 12px; margin-bottom: 20px; border-left: 5px solid #38bdf8; gap: 10px; }
@@ -57,12 +59,12 @@
 </head>
 <body>
 
-    <!-- Module 1: Role-Based Access Control -->
+    <!-- Module 1: Role-Based Access Control with PIN -->
     <div id="loginOverlay">
         <div class="login-box">
             <h2>🏥 Smart Care Portal</h2>
             <p style="color:#94a3b8; font-size:14px;">Select Access Role to Continue</p>
-            <button class="role-btn doc-btn" onclick="login('Doctor')">👨‍⚕️ Login as Doctor / Admin</button>
+            <button class="role-btn doc-btn" onclick="login('Doctor')">👨‍⚕️ Login as Doctor / Admin (PIN)</button>
             <button class="role-btn fam-btn" onclick="login('Family')">👪 Login as Family (View Only)</button>
         </div>
     </div>
@@ -158,16 +160,30 @@
 
     <script>
         const DB_URL = "https://smart-patient-monitor-8704e-default-rtdb.firebaseio.com";
+        const ADMIN_PIN = "1234"; // Change this PIN anytime
         let currentRole = "Doctor";
         let fanState = false, lightState = false, alarmMuted = false;
         let historyLogs = [];
 
-        // Role Login Logic
+        // Role Login Logic with Security PIN
         function login(role) {
+            if (role === 'Doctor') {
+                const enteredPin = prompt("Enter Doctor / Admin Security PIN:");
+                if (enteredPin === null) return; // User cancelled
+                if (enteredPin !== ADMIN_PIN) {
+                    alert("❌ Wrong Security PIN! Redirecting to Family (View-Only) mode.");
+                    role = 'Family';
+                }
+            }
+
             currentRole = role;
             document.getElementById('loginOverlay').style.display = 'none';
-            document.getElementById('roleBadge').innerText = `Role: ${role}`;
+            const badge = document.getElementById('roleBadge');
+            badge.innerText = `Role: ${role}`;
+
             if (role === 'Family') {
+                badge.style.background = "#475569";
+                badge.style.color = "#f8fafc";
                 document.getElementById('fanBtn').disabled = true;
                 document.getElementById('lightBtn').disabled = true;
                 document.getElementById('tempLimit').disabled = true;
