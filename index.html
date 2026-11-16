@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart IoT Patient & Room Monitoring</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #1e293b; padding: 15px 25px; border-radius: 12px; margin-bottom: 20px; border-left: 5px solid #38bdf8; }
+        .header h1 { margin: 0; font-size: 22px; color: #38bdf8; }
+        .status-badge { background: #065f46; color: #34d399; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; margin-left: 10px; }
+        .sim-btn { background: #10b981; color: white; border: none; padding: 10px 18px; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 14px; }
+        .sim-btn.active { background: #ef4444; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .card { background: #1e293b; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .card h3 { margin: 0 0 10px; font-size: 14px; color: #94a3b8; text-transform: uppercase; }
+        .card .value { font-size: 32px; font-weight: bold; color: #38bdf8; }
+        .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 20px; }
+        .control-box { background: #1e293b; padding: 20px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; }
+        .toggle-btn { padding: 10px 25px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 16px; transition: 0.3s; }
+        .off { background: #475569; color: white; }
+        .on { background: #38bdf8; color: #0f172a; }
+        .charts { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px; }
+        .chart-container { background: #1e293b; padding: 20px; border-radius: 12px; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <h1>🏥 Smart Patient Health & Room Automation <span class="status-badge" id="dbStatus">● Firebase Connected</span></h1>
+            <small style="color: #94a3b8;">Cloud Endpoint: smart-patient-monitor-8704e-default-rtdb.firebaseio.com</small>
+        </div>
+        <button id="simToggle" class="sim-btn" onclick="toggleSimulation()">▶ Start Live Cloud Simulation</button>
+    </div>
+
+    <!-- Sensor Cards -->
+    <div class="grid">
+        <div class="card">
+            <h3>Heart Rate (MAX30102)</h3>
+            <div class="value" id="hrVal">-- <small style="font-size:14px;">BPM</small></div>
+        </div>
+        <div class="card">
+            <h3>Blood Oxygen (SpO2)</h3>
+            <div class="value" id="spo2Val" style="color: #34d399;">-- <small style="font-size:14px;">%</small></div>
+        </div>
+        <div class="card">
+            <h3>Body Temp (MLX90614)</h3>
+            <div class="value" id="bodyTempVal" style="color: #fbbf24;">-- <small style="font-size:14px;">°F</small></div>
+        </div>
+        <div class="card">
+            <h3>Room Temp (DHT22)</h3>
+            <div class="value" id="roomTempVal" style="color: #f87171;">-- <small style="font-size:14px;">°C</small></div>
+        </div>
+        <div class="card">
+            <h3>Patient Status (MPU6050)</h3>
+            <div class="value" id="fallVal" style="color: #34d399; font-size: 24px;">NORMAL</div>
+        </div>
+    </div>
+
+    <!-- Interactive Room Automation Controls -->
+    <div class="controls">
+        <div class="control-box">
+            <div>
+                <h3 style="margin:0;">Cooling Fan (Relay 1)</h3>
+                <small id="fanMode" style="color:#94a3b8;">Mode: Auto (Triggers > 30°C)</small>
+            </div>
+            <button id="fanBtn" class="toggle-btn off" onclick="toggleDevice('fan')">OFF</button>
+        </div>
+        <div class="control-box">
+            <div>
+                <h3 style="margin:0;">Room Light (Relay 2)</h3>
+                <small style="color:#94a3b8;">Mode: Manual Override</small>
+            </div>
+            <button id="lightBtn" class="toggle-btn off" onclick="toggleDevice('light')">OFF</button>
+        </div>
+    </div>
+
+    <!-- Real-Time Charts -->
+    <div class="charts">
+        <div class="chart-container">
+            <canvas id="hrChart"></canvas>
+        </div>
+        <div class="chart-container">
+            <canvas id="tempChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        const DB_URL = "https://smart-patient-monitor-8704e-default-rtdb.firebaseio.com";
+
+        // --- Setup Live Charts ---
+        const labels = ['10s', '8s', '6s', '4s', '2s', 'Now'];
+        const hrChart = new Chart(document.getElementById('hrChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{ label: 'Live Heart Rate (BPM)', data: [74, 75, 77, 76, 78, 76], borderColor: '#38bdf8', tension: 0.4, fill: true, backgroundColor: 'rgba(56, 189, 248, 0.1)' }]
+            },
+            options: { plugins: { legend: { labels: { color: 'white' } } }, scales: { x: { ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8' } } } }
+        });
+
+        const tempChart = new Chart(document.getElementById('tempChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{ label: 'Room Temperature (°C)', data: [27.5, 28.0, 28.2, 28.5, 29.0, 28.5], borderColor: '#f87171', tension: 0.4, fill: true, backgroundColor: 'rgba(248, 113, 113, 0.1)' }]
+            },
+            options: { plugins: { legend: { labels: { color: 'white' } } }, scales: { x: { ticks: { color: '#94a3b8' } }, y: { ticks: { color: '#94a3b8' } } } }
+        });
+
+        let fanState = false;
+        let lightState = false;
+
+        // --- Send Control Commands to Firebase ---
+        async function toggleDevice(device) {
+            if (device === 'fan') {
+                fanState = !fanState;
+                updateButtonUI('fanBtn', fanState);
+            } else if (device === 'light') {
+                lightState = !lightState;
+                updateButtonUI('lightBtn', lightState);
+            }
+            await fetch(`${DB_URL}/controls.json`, {
+                method: 'PATCH',
+                body: JSON.stringify({ fan: fanState ? 1 : 0, light: lightState ? 1 : 0 })
+            });
+        }
+
+        function updateButtonUI(btnId, state) {
+            const btn = document.getElementById(btnId);
+            btn.innerText = state ? 'ON' : 'OFF';
+            btn.className = state ? 'toggle-btn on' : 'toggle-btn off';
+        }
+
+        // --- Fetch Live Data from Firebase ---
+        async function fetchFirebaseData() {
+            try {
+                const res = await fetch(`${DB_URL}/.json`);
+                const data = await res.json();
+                if (!data) return;
+
+                if (data.sensors) {
+                    const s = data.sensors;
+                    document.getElementById('hrVal').innerHTML = `${s.heartRate} <small style="font-size:14px;">BPM</small>`;
+                    document.getElementById('spo2Val').innerHTML = `${s.spo2} <small style="font-size:14px;">%</small>`;
+                    document.getElementById('bodyTempVal').innerHTML = `${s.bodyTemp} <small style="font-size:14px;">°F</small>`;
+                    document.getElementById('roomTempVal').innerHTML = `${s.roomTemp} <small style="font-size:14px;">°C</small>`;
+
+                    hrChart.data.datasets[0].data.shift();
+                    hrChart.data.datasets[0].data.push(s.heartRate);
+                    hrChart.update();
+
+                    tempChart.data.datasets[0].data.shift();
+                    tempChart.data.datasets[0].data.push(s.roomTemp);
+                    tempChart.update();
+                }
+
+                if (data.controls) {
+                    fanState = data.controls.fan === 1;
+                    lightState = data.controls.light === 1;
+                    updateButtonUI('fanBtn', fanState);
+                    updateButtonUI('lightBtn', lightState);
+                }
+            } catch (err) {
+                console.error("Firebase Sync Error:", err);
+            }
+        }
+
+        // Sync every 2 seconds
+        setInterval(fetchFirebaseData, 2000);
+
+        // --- Simulation Mode: Pushes realistic ESP32 data directly to Firebase ---
+        let simInterval = null;
+        function toggleSimulation() {
+            const btn = document.getElementById('simToggle');
+            if (simInterval) {
+                clearInterval(simInterval);
+                simInterval = null;
+                btn.innerText = '▶ Start Live Cloud Simulation';
+                btn.classList.remove('active');
+            } else {
+                btn.innerText = '⏹ Stop Simulation';
+                btn.classList.add('active');
+                simInterval = setInterval(async () => {
+                    const hr = Math.floor(Math.random() * (95 - 68 + 1)) + 68;
+                    const spo2 = Math.floor(Math.random() * (99 - 95 + 1)) + 95;
+                    const bodyTemp = parseFloat((Math.random() * (99.5 - 97.8) + 97.8).toFixed(1));
+                    const roomTemp = parseFloat((Math.random() * (32.0 - 27.5) + 27.5).toFixed(1));
+
+                    // Autonomous Fan Trigger (>30°C)
+                    if (roomTemp > 30.0 && !fanState) {
+                        fanState = true;
+                        document.getElementById('fanMode').innerText = "Mode: AUTO-TRIGGERED (>30°C)";
+                        document.getElementById('fanMode').style.color = "#38bdf8";
+                        await fetch(`${DB_URL}/controls.json`, {
+                            method: 'PATCH',
+                            body: JSON.stringify({ fan: 1 })
+                        });
+                    }
+
+                    // Push simulated sensor readings to Firebase
+                    await fetch(`${DB_URL}/sensors.json`, {
+                        method: 'PUT',
+                        body: JSON.stringify({
+                            heartRate: hr,
+                            spo2: spo2,
+                            bodyTemp: bodyTemp,
+                            roomTemp: roomTemp,
+                            fallDetected: false
+                        })
+                    });
+                }, 2500);
+            }
+        }
+    </script>
+</body>
+</html>
